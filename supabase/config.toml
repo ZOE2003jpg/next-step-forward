@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.wallet-alerts]
 verify_jwt = false
+
+[functions.initialize-payment]
+verify_jwt = false
+
+[functions.payment-webhook]
+verify_jwt = false
