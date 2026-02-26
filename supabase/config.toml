@@ -1,1 +1,13 @@
 project_id = "zlvptkwrehuoxvgwiurh"
+
+[functions.chat]
+verify_jwt = false
+
+[functions.auto-close-orders]
+verify_jwt = false
+
+[functions.daily-report]
+verify_jwt = false
+
+[functions.wallet-alerts]
+verify_jwt = false
