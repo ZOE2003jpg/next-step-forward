@@ -62,7 +62,7 @@ export function BottomNav({ role, tab, setTab, cartCount = 0 }: BottomNavProps) 
           </div>
         </div>
       )}
-      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] bg-[hsl(var(--surface-2))] border-t border-[hsl(var(--gold)/0.2)] flex items-center px-1 pt-2 pb-3.5 z-[100]">
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full bg-[hsl(var(--surface-2))] border-t border-[hsl(var(--gold)/0.2)] flex items-center px-1 pt-2 pb-3.5 z-[100]">
         {cfg.left.map((t) => <NavBtn key={t.id} t={t} />)}
         <div
           className="flex-1 flex flex-col items-center cursor-pointer -mt-6"

@@ -2,11 +2,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useStudentOrders } from "@/hooks/useOrders";
 import { useStudentDispatches } from "@/hooks/useDispatches";
+import { Spinner } from "@/components/Spinner";
 import { useNavigate } from "react-router-dom";
 
 export default function ProfileScreen() {
   const { signOut, role } = useAuth();
-  const { data: profile } = useProfile();
+  const { data: profile, isLoading } = useProfile();
   const { data: orders } = useStudentOrders();
   const { data: dispatches } = useStudentDispatches();
   const navigate = useNavigate();
@@ -16,10 +17,12 @@ export default function ProfileScreen() {
     navigate("/auth");
   };
 
+  if (isLoading) return <div className="flex justify-center items-center min-h-[300px]"><Spinner size={32} /></div>;
+
   const initial = profile?.full_name?.[0]?.toUpperCase() || "?";
 
   return (
-    <div className="p-6 px-4 flex flex-col gap-5 animate-fade-up">
+    <div className="p-6 px-4 flex flex-col gap-5 animate-fade-up max-w-[800px] mx-auto">
       <div className="text-center pt-2.5">
         <div className="w-20 h-20 rounded-full gradient-gold mx-auto mb-3.5 flex items-center justify-center text-4xl font-bold text-primary-foreground">{initial}</div>
         <div className="font-display text-[28px] font-bold text-foreground">{profile?.full_name}</div>

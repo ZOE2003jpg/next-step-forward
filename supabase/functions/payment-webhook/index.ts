@@ -20,9 +20,23 @@ serve(async (req) => {
 
     const amount = data.amount || data.data?.amount;
     const userId = data.metadata?.user_id || data.data?.metadata?.user_id;
+    const reference = data.reference || data.data?.reference;
     if (!amount || !userId) throw new Error("Missing amount or user_id");
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+    // IDEMPOTENCY CHECK: check if this reference was already processed
+    if (reference) {
+      const { data: existingTx } = await supabase
+        .from("wallet_transactions")
+        .select("id")
+        .eq("label", `KoraPay:${reference}`)
+        .limit(1);
+      if (existingTx && existingTx.length > 0) {
+        console.log("Duplicate webhook ignored:", reference);
+        return new Response(JSON.stringify({ success: true, duplicate: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
 
     // Get wallet
     const { data: wallet, error: we } = await supabase.from("wallets").select("*").eq("user_id", userId).single();
@@ -46,12 +60,12 @@ serve(async (req) => {
           await supabase.from("wallets").update({ balance: vendorWallet.balance + vendorAmount }).eq("id", vendorWallet.id);
           await supabase.from("wallet_transactions").insert({
             user_id: restaurant.owner_id, wallet_id: vendorWallet.id, amount: vendorAmount,
-            label: "Order Payment", icon: "💰",
+            label: reference ? `KoraPay:${reference}` : "Order Payment", icon: "💰",
           });
         }
       }
 
-      // Log platform commission (to first admin wallet if exists)
+      // Log platform commission
       const { data: adminRole } = await supabase.from("user_roles").select("user_id").eq("role", "admin").limit(1).single();
       if (adminRole) {
         const { data: adminWallet } = await supabase.from("wallets").select("*").eq("user_id", adminRole.user_id).single();
@@ -68,7 +82,7 @@ serve(async (req) => {
       await supabase.from("wallets").update({ balance: wallet.balance + amount }).eq("id", wallet.id);
       await supabase.from("wallet_transactions").insert({
         user_id: userId, wallet_id: wallet.id, amount,
-        label: "Wallet Top-up (KoraPay)", icon: "💳",
+        label: reference ? `KoraPay:${reference}` : "Wallet Top-up (KoraPay)", icon: "💳",
       });
     }
 

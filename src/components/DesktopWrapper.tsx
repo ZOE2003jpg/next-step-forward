@@ -9,7 +9,7 @@ export function DesktopWrapper({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("resize", h);
   }, []);
 
-  if (!isDesktop) return <div className="h-full max-w-[480px] mx-auto">{children}</div>;
+  if (!isDesktop) return <div className="h-full w-full mx-auto">{children}</div>;
 
   return (
     <div className="min-h-screen bg-background flex items-stretch relative overflow-hidden">

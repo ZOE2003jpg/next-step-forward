@@ -1,22 +1,39 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
 import { useWallet } from "@/hooks/useWallet";
-import { useStudentOrders } from "@/hooks/useOrders";
+import { useStudentOrders, useCancelOrder, useDisputeOrder } from "@/hooks/useOrders";
 import { STitle } from "@/components/STitle";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Spinner } from "@/components/Spinner";
 import { format } from "date-fns";
+import { useState } from "react";
+import { toast } from "sonner";
 
 export default function StudentHome({ setTab }: { setTab: (t: string) => void }) {
   const { data: profile } = useProfile();
-  const { data: wallet } = useWallet();
-  const { data: orders } = useStudentOrders();
+  const { data: wallet, isLoading: walletLoading } = useWallet();
+  const { data: orders, isLoading: ordersLoading } = useStudentOrders();
+  const cancelOrder = useCancelOrder();
+  const disputeOrder = useDisputeOrder();
+  const [disputeId, setDisputeId] = useState<string | null>(null);
+  const [disputeReason, setDisputeReason] = useState("");
 
   const firstName = profile?.full_name?.split(" ")[0] || "there";
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
 
+  const handleDispute = async () => {
+    if (!disputeId || !disputeReason) { toast.error("Enter a reason"); return; }
+    try {
+      await disputeOrder.mutateAsync({ orderId: disputeId, reason: disputeReason });
+      toast.success("Dispute submitted");
+      setDisputeId(null);
+      setDisputeReason("");
+    } catch (e: any) { toast.error(e.message); }
+  };
+
   return (
-    <div className="p-6 px-4 flex flex-col gap-6 animate-fade-up">
+    <div className="p-6 px-4 flex flex-col gap-6 animate-fade-up max-w-[800px] mx-auto">
       <div className="flex justify-between items-start">
         <div>
           <div className="text-muted-foreground text-[13px]">{greeting},</div>
@@ -24,7 +41,9 @@ export default function StudentHome({ setTab }: { setTab: (t: string) => void })
         </div>
         <div onClick={() => setTab("wallet")} className="bg-card border border-border rounded-xl py-2.5 px-4 text-right cursor-pointer hover-gold transition-all">
           <div className="text-[10px] text-muted-foreground tracking-wider">WALLET</div>
-          <div className="text-base font-bold text-primary font-mono-dm">₦{(wallet?.balance ?? 0).toLocaleString()}</div>
+          {walletLoading ? <Spinner /> : (
+            <div className="text-base font-bold text-primary font-mono-dm">₦{(wallet?.balance ?? 0).toLocaleString()}</div>
+          )}
         </div>
       </div>
 
@@ -58,23 +77,60 @@ export default function StudentHome({ setTab }: { setTab: (t: string) => void })
           <span className="text-xs text-primary cursor-pointer">See all</span>
         </div>
         <div className="flex flex-col gap-2.5">
-          {(!orders || orders.length === 0) && (
-            <div className="bg-card border border-border rounded-2xl p-5 text-center text-muted-foreground text-sm">No orders yet</div>
+          {ordersLoading && <div className="flex justify-center py-6"><Spinner /></div>}
+          {!ordersLoading && (!orders || orders.length === 0) && (
+            <div className="bg-card border border-border rounded-2xl p-5 text-center text-muted-foreground text-sm">No orders yet. Try NexChow! 🍽️</div>
           )}
           {orders?.slice(0, 5).map((o) => (
-            <div key={o.id} className="bg-card border border-border rounded-2xl p-5 flex justify-between items-center">
-              <div>
-                <div className="font-semibold text-sm text-foreground">
-                  {o.order_items?.map((i: any) => i.name).join(", ") || "Order"}
+            <div key={o.id} className="bg-card border border-border rounded-2xl p-5">
+              <div className="flex justify-between items-center">
+                <div>
+                  <div className="font-semibold text-sm text-foreground">
+                    {o.order_items?.map((i: any) => i.name).join(", ") || "Order"}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {o.order_number} · {format(new Date(o.created_at), "MMM d, h:mm a")}
+                  </div>
+                  {o.status === "out_for_delivery" && (o as any).delivery_otp && (
+                    <div className="text-xs text-primary font-mono-dm mt-1">OTP: {(o as any).delivery_otp}</div>
+                  )}
                 </div>
-                <div className="text-xs text-muted-foreground mt-0.5">
-                  {o.order_number} · {format(new Date(o.created_at), "MMM d, h:mm a")}
+                <div className="text-right">
+                  <div className="font-bold text-primary font-mono-dm text-[13px]">₦{o.total_amount.toLocaleString()}</div>
+                  <StatusBadge status={o.status} />
                 </div>
               </div>
-              <div className="text-right">
-                <div className="font-bold text-primary font-mono-dm text-[13px]">₦{o.total_amount.toLocaleString()}</div>
-                <StatusBadge status={o.status} />
+              <div className="flex gap-2 mt-2">
+                {o.status === "pending" && (
+                  <button
+                    onClick={() => cancelOrder.mutate({ orderId: o.id }, { onSuccess: () => toast.success("Order cancelled & refunded"), onError: (e) => toast.error(e.message) })}
+                    disabled={cancelOrder.isPending}
+                    className="bg-transparent border border-destructive/40 text-destructive py-1.5 px-3 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-70"
+                  >Cancel</button>
+                )}
+                {o.status === "delivered" && (
+                  <button
+                    onClick={() => setDisputeId(o.id)}
+                    className="bg-transparent border border-primary/40 text-primary py-1.5 px-3 rounded-lg text-xs font-semibold cursor-pointer"
+                  >Dispute</button>
+                )}
               </div>
+              {disputeId === o.id && (
+                <div className="mt-3 flex flex-col gap-2">
+                  <input
+                    className="w-full p-2.5 bg-secondary border border-border rounded-lg text-foreground text-sm outline-none"
+                    placeholder="Describe the issue…"
+                    value={disputeReason}
+                    onChange={(e) => setDisputeReason(e.target.value)}
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={handleDispute} disabled={disputeOrder.isPending} className="gradient-gold-subtle py-1.5 px-3 rounded-lg text-primary-foreground text-xs font-semibold cursor-pointer border-none disabled:opacity-70">
+                      {disputeOrder.isPending ? <Spinner /> : "Submit"}
+                    </button>
+                    <button onClick={() => setDisputeId(null)} className="bg-secondary text-foreground border border-border rounded-lg py-1.5 px-3 text-xs cursor-pointer">Cancel</button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
