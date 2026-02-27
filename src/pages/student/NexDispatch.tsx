@@ -12,7 +12,7 @@ export default function NexDispatch() {
   const [pickup, setPickup] = useState("");
   const [dropoff, setDropoff] = useState("");
   const [desc, setDesc] = useState("");
-  const { data: dispatches } = useStudentDispatches();
+  const { data: dispatches, isLoading } = useStudentDispatches();
   const { data: settings } = usePlatformSettings();
   const createDispatch = useCreateDispatch();
 
@@ -29,7 +29,7 @@ export default function NexDispatch() {
   };
 
   return (
-    <div className="p-6 px-4 animate-fade-up">
+    <div className="p-6 px-4 animate-fade-up max-w-[800px] mx-auto">
       <PHeader title="NexDispatch" sub="Send campus packages" icon="📦" />
       <div className="grid grid-cols-2 gap-3 mt-5">
         {[
@@ -65,7 +65,8 @@ export default function NexDispatch() {
       )}
       {view === "track" && (
         <div className="mt-6 flex flex-col gap-3.5">
-          {(!dispatches || dispatches.length === 0) && (
+          {isLoading && <div className="flex justify-center py-6"><Spinner /></div>}
+          {!isLoading && (!dispatches || dispatches.length === 0) && (
             <div className="bg-card border border-border rounded-2xl p-8 text-center text-muted-foreground text-sm">No dispatches yet</div>
           )}
           {dispatches?.map((d) => (

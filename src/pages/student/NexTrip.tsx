@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 
 export default function NexTrip() {
-  const { data: routes } = useTripRoutes();
+  const { data: routes, isLoading } = useTripRoutes();
   const { data: wallet } = useWallet();
   const bookTrip = useBookTrip();
   const [sel, setSel] = useState<Tables<"trip_routes"> | null>(null);
@@ -43,10 +43,11 @@ export default function NexTrip() {
   }
 
   return (
-    <div className="p-6 px-4 animate-fade-up">
+    <div className="p-6 px-4 animate-fade-up max-w-[800px] mx-auto">
       <PHeader title="NexTrip" sub="Campus shuttle booking" icon="🚌" />
       <div className="flex flex-col gap-3.5 mt-5">
-        {(routes || []).map((r) => (
+        {isLoading && <div className="flex justify-center py-8"><Spinner size={28} /></div>}
+        {!isLoading && (routes || []).map((r) => (
           <div key={r.id} onClick={() => setSel(r)} className={`bg-card rounded-2xl p-5 cursor-pointer transition-all border ${sel?.id === r.id ? "border-primary bg-[hsl(var(--gold-glow))]" : "border-border"}`}>
             <div className="flex justify-between items-start">
               <div>
@@ -62,7 +63,7 @@ export default function NexTrip() {
             </div>
           </div>
         ))}
-        {(!routes || routes.length === 0) && (
+        {!isLoading && (!routes || routes.length === 0) && (
           <div className="bg-card border border-border rounded-2xl p-8 text-center text-muted-foreground text-sm">No routes available</div>
         )}
       </div>

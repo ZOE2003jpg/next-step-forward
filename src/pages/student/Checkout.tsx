@@ -21,16 +21,19 @@ export default function Checkout({ onBack, onDone }: Props) {
   const [pay, setPay] = useState("wallet");
   const [address, setAddress] = useState("");
   const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const fee = settings?.delivery_fee ?? 150;
   const grandTotal = total + fee;
 
   const place = async () => {
+    if (submitting) return; // Prevent double submission
     if (!restaurantId) { toast.error("No restaurant selected"); return; }
     if (pay === "wallet" && (wallet?.balance ?? 0) < grandTotal) {
       toast.error("Insufficient wallet balance");
       return;
     }
+    setSubmitting(true);
     try {
       await placeOrder.mutateAsync({
         restaurantId,
@@ -46,6 +49,7 @@ export default function Checkout({ onBack, onDone }: Props) {
     } catch (e: any) {
       toast.error(e.message || "Failed to place order");
     }
+    setSubmitting(false);
   };
 
   if (done) {
@@ -53,13 +57,13 @@ export default function Checkout({ onBack, onDone }: Props) {
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 animate-fade-up">
         <div className="text-[80px]">🎉</div>
         <div className="font-display text-4xl font-bold text-primary text-center">Order Placed!</div>
-        <div className="text-muted-foreground text-center text-sm max-w-[260px]">Your food is being prepared. Estimated delivery: 25 minutes.</div>
+        <div className="text-muted-foreground text-center text-sm max-w-[260px]">Your food is being prepared. You'll get updates in real-time.</div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 px-4 flex flex-col gap-4 animate-fade-up">
+    <div className="p-6 px-4 flex flex-col gap-4 animate-fade-up max-w-[800px] mx-auto">
       <button onClick={onBack} className="w-fit bg-secondary text-foreground border border-border rounded-lg py-2 px-4 text-[13px] cursor-pointer font-semibold">← Back</button>
       <PHeader title="Checkout" sub="Review your order" icon="🛒" />
       <div className="bg-card border border-border rounded-2xl p-5">
@@ -103,8 +107,8 @@ export default function Checkout({ onBack, onDone }: Props) {
           ))}
         </div>
       </div>
-      <button onClick={place} disabled={placeOrder.isPending} className="w-full py-4 gradient-gold-subtle rounded-[14px] text-primary-foreground font-semibold text-[15px] cursor-pointer border-none disabled:opacity-70 flex items-center justify-center gap-2">
-        {placeOrder.isPending ? <><Spinner /> Placing…</> : `Place Order · ₦${grandTotal.toLocaleString()}`}
+      <button onClick={place} disabled={submitting || placeOrder.isPending} className="w-full py-4 gradient-gold-subtle rounded-[14px] text-primary-foreground font-semibold text-[15px] cursor-pointer border-none disabled:opacity-70 flex items-center justify-center gap-2">
+        {(submitting || placeOrder.isPending) ? <><Spinner /> Placing…</> : `Place Order · ₦${grandTotal.toLocaleString()}`}
       </button>
     </div>
   );

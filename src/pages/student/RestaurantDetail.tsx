@@ -1,6 +1,7 @@
 import { useMenuItems } from "@/hooks/useMenuItems";
 import { useCart } from "@/hooks/useCart";
 import { STitle } from "@/components/STitle";
+import { Spinner } from "@/components/Spinner";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -11,7 +12,7 @@ interface Props {
 }
 
 export default function RestaurantDetail({ restaurant, onBack, onCheckout }: Props) {
-  const { data: items } = useMenuItems(restaurant.id);
+  const { data: items, isLoading } = useMenuItems(restaurant.id);
   const { cart, addItem, removeItem, total, setRestaurantId } = useCart();
 
   const qty = (id: string) => cart.find((c) => c.id === id)?.qty || 0;
@@ -23,7 +24,7 @@ export default function RestaurantDetail({ restaurant, onBack, onCheckout }: Pro
   };
 
   return (
-    <div className="p-6 px-4 animate-fade-up">
+    <div className="p-6 px-4 animate-fade-up max-w-[800px] mx-auto">
       <button onClick={onBack} className="bg-secondary text-foreground border border-border rounded-lg py-2 px-4 text-[13px] cursor-pointer mb-4 font-semibold">← Back</button>
       <div className="bg-secondary border border-border rounded-2xl p-5 flex gap-4 items-center mb-5">
         <div className="text-[52px]">{restaurant.image}</div>
@@ -38,7 +39,8 @@ export default function RestaurantDetail({ restaurant, onBack, onCheckout }: Pro
       </div>
       <STitle>Menu</STitle>
       <div className="flex flex-col gap-3 mt-3" style={{ paddingBottom: total > 0 ? 80 : 0 }}>
-        {(items || []).filter((i) => i.available).map((item) => (
+        {isLoading && <div className="flex justify-center py-8"><Spinner size={28} /></div>}
+        {!isLoading && (items || []).filter((i) => i.available).map((item) => (
           <div key={item.id} className="bg-card border border-border rounded-2xl p-5 flex justify-between items-center">
             <div className="flex gap-3 items-center">
               <span className="text-[32px]">{item.image}</span>
@@ -59,12 +61,12 @@ export default function RestaurantDetail({ restaurant, onBack, onCheckout }: Pro
             </div>
           </div>
         ))}
-        {(!items || items.length === 0) && (
+        {!isLoading && (!items || items.length === 0) && (
           <div className="bg-card border border-border rounded-2xl p-8 text-center text-muted-foreground text-sm">No menu items yet</div>
         )}
       </div>
       {total > 0 && (
-        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[448px] z-[90]">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-[calc(100%-32px)] max-w-[800px] z-[90]">
           <button onClick={onCheckout} className="w-full py-4 gradient-gold-subtle rounded-[14px] text-primary-foreground font-semibold text-[15px] shadow-[0_8px_24px_hsl(var(--gold)/0.35)] cursor-pointer border-none">
             Checkout · ₦{total.toLocaleString()} →
           </button>

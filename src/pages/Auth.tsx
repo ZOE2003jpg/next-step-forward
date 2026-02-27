@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { NEXGO_LOGO, DEFAULT_TAB, type AppRole } from "@/lib/constants";
+import { NEXGO_LOGO, type AppRole } from "@/lib/constants";
 import { Spinner } from "@/components/Spinner";
 import { Lbl } from "@/components/Lbl";
 import { toast } from "sonner";
@@ -13,8 +13,15 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp, resetPassword } = useAuth();
+  const { signIn, signUp, resetPassword, user, role: dbRole } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already logged in and role is loaded
+  useEffect(() => {
+    if (user && dbRole) {
+      navigate(`/${dbRole}`, { replace: true });
+    }
+  }, [user, dbRole, navigate]);
 
   const handleLogin = async () => {
     if (!email || !password) { toast.error("Fill all fields"); return; }
@@ -22,7 +29,7 @@ export default function Auth() {
     const { error } = await signIn(email, password);
     setLoading(false);
     if (error) { toast.error(error); return; }
-    navigate(`/${role}`);
+    // Navigation will happen via the useEffect above once role loads
   };
 
   const handleRegister = async () => {
@@ -71,14 +78,6 @@ export default function Auth() {
               <input className="w-full p-3 bg-secondary border border-border rounded-[10px] text-foreground text-sm outline-none focus:border-primary transition-colors" placeholder="you@university.edu.ng" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
               <Lbl>Password</Lbl>
               <input className="w-full p-3 bg-secondary border border-border rounded-[10px] text-foreground text-sm outline-none focus:border-primary transition-colors" placeholder="••••••••" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-              <Lbl>Login as</Lbl>
-              <div className="grid grid-cols-4 gap-2">
-                {roles.map(({ r, ic }) => (
-                  <button key={r} onClick={() => setRole(r)} className={`py-2.5 px-2 rounded-lg text-xs font-semibold border cursor-pointer capitalize transition-all ${role === r ? "border-primary bg-[hsl(var(--gold-glow))] text-primary" : "border-border bg-secondary text-muted-foreground"}`}>
-                    {ic} {r}
-                  </button>
-                ))}
-              </div>
               <button onClick={handleLogin} disabled={loading} className="w-full py-3.5 mt-1.5 gradient-gold-subtle rounded-[10px] text-primary-foreground font-semibold text-sm tracking-wider cursor-pointer disabled:opacity-70 flex items-center justify-center gap-2">
                 {loading ? <Spinner /> : "Continue →"}
               </button>

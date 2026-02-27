@@ -14,13 +14,13 @@ import { toast } from "sonner";
 
 export default function AdminApp({ tab }: { tab: string }) {
   const { user, signOut } = useAuth();
-  const { data: orders } = useAdminOrders();
+  const { data: orders, isLoading: ordersLoading } = useAdminOrders();
   const { data: settings } = usePlatformSettings();
   const updateSetting = useUpdatePlatformSetting();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
 
-  const { data: allProfiles } = useQuery({
+  const { data: allProfiles, isLoading: profilesLoading } = useQuery({
     queryKey: ["admin-profiles"],
     queryFn: async () => {
       const { data } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
@@ -44,9 +44,10 @@ export default function AdminApp({ tab }: { tab: string }) {
   if (tab === "users") {
     const filtered = users.filter((u) => u.full_name.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
     return (
-      <div className="p-6 px-4 flex flex-col gap-3.5 animate-fade-up">
+      <div className="p-6 px-4 flex flex-col gap-3.5 animate-fade-up max-w-[800px] mx-auto">
         <PHeader title="Users" sub="Manage all users" icon="👥" />
         <input className="w-full p-3 bg-secondary border border-border rounded-[10px] text-foreground text-sm outline-none focus:border-primary" placeholder="🔍 Search users…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        {profilesLoading && <div className="flex justify-center py-8"><Spinner size={28} /></div>}
         {filtered.map((u) => (
           <div key={u.id} className="bg-card border border-border rounded-2xl p-5 flex justify-between items-center">
             <div className="flex gap-2.5 items-center">
@@ -66,7 +67,7 @@ export default function AdminApp({ tab }: { tab: string }) {
   if (tab === "analytics") {
     const totalRevenue = orders?.reduce((a, o) => a + o.total_amount, 0) ?? 0;
     return (
-      <div className="p-6 px-4 flex flex-col gap-5 animate-fade-up">
+      <div className="p-6 px-4 flex flex-col gap-5 animate-fade-up max-w-[800px] mx-auto">
         <PHeader title="Analytics" sub="Platform performance" icon="📈" />
         <div className="grid grid-cols-2 gap-3">
           {[
@@ -76,24 +77,11 @@ export default function AdminApp({ tab }: { tab: string }) {
             { l: "Restaurants", v: "-", ic: "🍽️" },
           ].map((s) => (
             <div key={s.l} className="bg-card border border-border rounded-2xl p-4">
-              <div className="flex justify-between">
-                <div className="text-2xl">{s.ic}</div>
-              </div>
+              <div className="flex justify-between"><div className="text-2xl">{s.ic}</div></div>
               <div className="font-mono-dm text-xl font-bold text-primary mt-2">{s.v}</div>
               <div className="text-xs text-muted-foreground mt-1">{s.l}</div>
             </div>
           ))}
-        </div>
-        <div className="bg-card border border-border rounded-2xl p-5">
-          <STitle>Weekly Activity</STitle>
-          <div className="mt-4 flex items-end gap-2 h-[100px]">
-            {[40, 65, 55, 80, 90, 70, 85].map((h, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
-                <div className="w-full rounded-t" style={{ height: `${h}%`, background: i === 6 ? "linear-gradient(180deg, hsl(var(--gold)), hsl(var(--gold-dark)))" : "hsl(var(--gold) / 0.26)" }} />
-                <div className="text-[10px] text-muted-foreground">{"MTWTFSS"[i]}</div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     );
@@ -101,7 +89,7 @@ export default function AdminApp({ tab }: { tab: string }) {
 
   if (tab === "settings") {
     return (
-      <div className="p-6 px-4 flex flex-col gap-5 animate-fade-up">
+      <div className="p-6 px-4 flex flex-col gap-5 animate-fade-up max-w-[800px] mx-auto">
         <PHeader title="Settings" sub="Platform configuration" icon="⚙️" />
         <div className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-4">
           <STitle>Fee Management</STitle>
@@ -132,7 +120,7 @@ export default function AdminApp({ tab }: { tab: string }) {
 
   if (tab === "profile") {
     return (
-      <div className="p-6 px-4 flex flex-col gap-5 animate-fade-up">
+      <div className="p-6 px-4 flex flex-col gap-5 animate-fade-up max-w-[800px] mx-auto">
         <div className="text-center pt-2.5">
           <div className="w-20 h-20 rounded-full bg-[linear-gradient(135deg,#1A1A2E,#16213E)] border-2 border-primary mx-auto mb-3.5 flex items-center justify-center text-[32px]">⚙️</div>
           <div className="font-display text-[28px] font-bold text-foreground">Super Admin</div>
@@ -157,8 +145,9 @@ export default function AdminApp({ tab }: { tab: string }) {
   const todayRevenue = todayOrders.reduce((a, o) => a + o.total_amount, 0);
 
   return (
-    <div className="p-6 px-4 flex flex-col gap-5 animate-fade-up">
+    <div className="p-6 px-4 flex flex-col gap-5 animate-fade-up max-w-[800px] mx-auto">
       <PHeader title="Admin Panel" sub="NexGo operations overview" icon="⚙️" />
+      {ordersLoading && <div className="flex justify-center py-8"><Spinner size={28} /></div>}
       <div className="grid grid-cols-2 gap-3">
         {[
           { label: "Total Users", value: String(users.length), icon: "👥" },
@@ -179,6 +168,7 @@ export default function AdminApp({ tab }: { tab: string }) {
       </div>
       <div className="bg-card border border-border rounded-2xl p-5">
         <STitle>Recent Users</STitle>
+        {profilesLoading && <div className="flex justify-center py-4"><Spinner /></div>}
         {users.slice(0, 4).map((u, i, arr) => (
           <div key={u.id} className={`flex justify-between items-center py-3 ${i < arr.length - 1 ? "border-b border-border" : ""}`}>
             <div className="flex gap-2.5 items-center">

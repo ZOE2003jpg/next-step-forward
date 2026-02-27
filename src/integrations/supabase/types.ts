@@ -138,12 +138,19 @@ export type Database = {
       }
       orders: {
         Row: {
+          cancellation_reason: string | null
+          cancelled_by: string | null
           created_at: string
           delivery_address: string | null
           delivery_fee: number
+          delivery_otp: string | null
+          delivery_otp_expires_at: string | null
+          dispute_reason: string | null
+          disputed_at: string | null
           id: string
           order_number: string
           payment_method: string
+          payment_reference: string | null
           restaurant_id: string
           rider_id: string | null
           status: string
@@ -152,12 +159,19 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cancellation_reason?: string | null
+          cancelled_by?: string | null
           created_at?: string
           delivery_address?: string | null
           delivery_fee?: number
+          delivery_otp?: string | null
+          delivery_otp_expires_at?: string | null
+          dispute_reason?: string | null
+          disputed_at?: string | null
           id?: string
           order_number: string
           payment_method?: string
+          payment_reference?: string | null
           restaurant_id: string
           rider_id?: string | null
           status?: string
@@ -166,12 +180,19 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cancellation_reason?: string | null
+          cancelled_by?: string | null
           created_at?: string
           delivery_address?: string | null
           delivery_fee?: number
+          delivery_otp?: string | null
+          delivery_otp_expires_at?: string | null
+          dispute_reason?: string | null
+          disputed_at?: string | null
           id?: string
           order_number?: string
           payment_method?: string
+          payment_reference?: string | null
           restaurant_id?: string
           rider_id?: string | null
           status?: string
@@ -429,6 +450,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_delivery_otp: { Args: { _order_id: string }; Returns: string }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
@@ -438,6 +460,14 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      validate_order_transition: {
+        Args: { _new_status: string; _order_id: string; _user_id: string }
+        Returns: Json
+      }
+      verify_delivery_otp: {
+        Args: { _order_id: string; _otp: string }
         Returns: boolean
       }
     }

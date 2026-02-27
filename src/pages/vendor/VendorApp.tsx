@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyRestaurant } from "@/hooks/useRestaurants";
-import { useVendorOrders, useUpdateOrderStatus } from "@/hooks/useOrders";
+import { useVendorOrders, useUpdateOrderStatus, useCancelOrder } from "@/hooks/useOrders";
 import { useMenuItems, useAddMenuItem, useDeleteMenuItem } from "@/hooks/useMenuItems";
 import { PHeader } from "@/components/PHeader";
 import { STitle } from "@/components/STitle";
@@ -15,10 +15,11 @@ import { format } from "date-fns";
 
 export default function VendorApp({ tab }: { tab: string }) {
   const { user, signOut } = useAuth();
-  const { data: restaurant } = useMyRestaurant(user?.id);
-  const { data: orders } = useVendorOrders(restaurant?.id);
-  const { data: menuItems } = useMenuItems(restaurant?.id);
+  const { data: restaurant, isLoading: restLoading } = useMyRestaurant(user?.id);
+  const { data: orders, isLoading: ordersLoading } = useVendorOrders(restaurant?.id);
+  const { data: menuItems, isLoading: menuLoading } = useMenuItems(restaurant?.id);
   const updateStatus = useUpdateOrderStatus();
+  const cancelOrder = useCancelOrder();
   const addMenuItem = useAddMenuItem();
   const deleteMenuItem = useDeleteMenuItem();
   const navigate = useNavigate();
@@ -33,10 +34,19 @@ export default function VendorApp({ tab }: { tab: string }) {
     await supabase.from("restaurants").update({ is_open: newVal }).eq("id", restaurant.id);
   };
 
+  // Strict state machine transitions for vendor
   const nextStatus = (status: string) => {
-    if (status === "Pending") return "Preparing";
-    if (status === "Preparing") return "Ready";
-    return "Done";
+    if (status === "pending") return "accepted";
+    if (status === "accepted") return "preparing";
+    if (status === "preparing") return "ready";
+    return null;
+  };
+
+  const nextLabel = (status: string) => {
+    if (status === "pending") return "Accept Order";
+    if (status === "accepted") return "Start Prep";
+    if (status === "preparing") return "Mark Ready";
+    return null;
   };
 
   const handleAddItem = async () => {
@@ -51,34 +61,52 @@ export default function VendorApp({ tab }: { tab: string }) {
 
   if (tab === "orders") {
     return (
-      <div className="p-6 px-4 flex flex-col gap-3.5 animate-fade-up">
+      <div className="p-6 px-4 flex flex-col gap-3.5 animate-fade-up max-w-[800px] mx-auto">
         <PHeader title="Orders" sub="Manage incoming orders" icon="📦" />
-        {(!orders || orders.length === 0) && <div className="bg-card border border-border rounded-2xl p-8 text-center text-muted-foreground text-sm">No orders yet</div>}
-        {orders?.map((o) => (
-          <div key={o.id} className="bg-card border border-border rounded-2xl p-5">
-            <div className="flex justify-between mb-2.5">
-              <span className="font-bold text-foreground">{o.order_number}</span>
-              <StatusBadge status={o.status} />
+        {ordersLoading && <div className="flex justify-center py-8"><Spinner size={28} /></div>}
+        {!ordersLoading && (!orders || orders.length === 0) && <div className="bg-card border border-border rounded-2xl p-8 text-center text-muted-foreground text-sm">No orders yet</div>}
+        {orders?.map((o) => {
+          const ns = nextStatus(o.status);
+          const nl = nextLabel(o.status);
+          const canCancel = ["pending", "accepted", "preparing"].includes(o.status);
+          return (
+            <div key={o.id} className="bg-card border border-border rounded-2xl p-5">
+              <div className="flex justify-between mb-2.5">
+                <span className="font-bold text-foreground">{o.order_number}</span>
+                <StatusBadge status={o.status} />
+              </div>
+              <div className="text-[13px] text-muted-foreground mb-0.5">{o.order_items?.map((i: any) => `${i.name} x${i.quantity}`).join(", ")}</div>
+              <div className="text-[13px] text-muted-foreground mb-1">{o.delivery_address && `📍 ${o.delivery_address}`}</div>
+              <div className="text-[13px] text-muted-foreground mb-3">{format(new Date(o.created_at), "MMM d, h:mm a")}</div>
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-primary font-mono-dm font-bold">₦{o.total_amount.toLocaleString()}</span>
+                <div className="flex gap-2">
+                  {canCancel && (
+                    <button
+                      onClick={() => cancelOrder.mutate({ orderId: o.id, reason: "Cancelled by vendor" }, { onSuccess: () => toast.success("Order cancelled"), onError: (e) => toast.error(e.message) })}
+                      disabled={cancelOrder.isPending}
+                      className="bg-transparent border border-destructive/40 text-destructive py-2 px-3 rounded-lg text-xs font-semibold cursor-pointer"
+                    >Cancel</button>
+                  )}
+                  {ns && nl && (
+                    <button
+                      onClick={() => updateStatus.mutate({ id: o.id, status: ns }, { onSuccess: () => toast.success(nl!), onError: (e) => toast.error(e.message) })}
+                      disabled={updateStatus.isPending}
+                      className="gradient-gold-subtle py-2 px-4 rounded-lg text-primary-foreground text-xs font-semibold cursor-pointer border-none disabled:opacity-70"
+                    >{updateStatus.isPending ? <Spinner /> : nl}</button>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="text-[13px] text-muted-foreground mb-0.5">{o.order_items?.map((i: any) => `${i.name} x${i.quantity}`).join(", ")}</div>
-            <div className="text-[13px] text-muted-foreground mb-3">{format(new Date(o.created_at), "MMM d, h:mm a")}</div>
-            <div className="flex justify-between items-center">
-              <span className="text-primary font-mono-dm font-bold">₦{o.total_amount.toLocaleString()}</span>
-              {o.status !== "Done" && (
-                <button onClick={() => updateStatus.mutate({ id: o.id, status: nextStatus(o.status) })} className="gradient-gold-subtle py-2 px-4 rounded-lg text-primary-foreground text-xs font-semibold cursor-pointer border-none">
-                  {o.status === "Pending" ? "Start Prep" : o.status === "Preparing" ? "Mark Ready" : "Complete"}
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   }
 
   if (tab === "menu") {
     return (
-      <div className="p-6 px-4 flex flex-col gap-3.5 animate-fade-up">
+      <div className="p-6 px-4 flex flex-col gap-3.5 animate-fade-up max-w-[800px] mx-auto">
         <div className="flex justify-between items-center">
           <PHeader title="Menu" sub="Manage your items" icon="🍽️" />
           <button onClick={() => setShowAdd(true)} className="gradient-gold-subtle py-2 px-4 rounded-lg text-primary-foreground text-[13px] font-semibold cursor-pointer border-none">+ Add</button>
@@ -99,6 +127,7 @@ export default function VendorApp({ tab }: { tab: string }) {
             </div>
           </div>
         )}
+        {menuLoading && <div className="flex justify-center py-8"><Spinner size={28} /></div>}
         {menuItems?.map((item) => (
           <div key={item.id} className="bg-card border border-border rounded-2xl p-5 flex justify-between items-center">
             <div className="flex gap-3 items-center">
@@ -121,7 +150,7 @@ export default function VendorApp({ tab }: { tab: string }) {
     const todayOrders = orders?.filter((o) => new Date(o.created_at).toDateString() === new Date().toDateString()) ?? [];
     const todayRevenue = todayOrders.reduce((a, o) => a + o.total_amount, 0);
     return (
-      <div className="p-6 px-4 flex flex-col gap-5 animate-fade-up">
+      <div className="p-6 px-4 flex flex-col gap-5 animate-fade-up max-w-[800px] mx-auto">
         <PHeader title="Earnings" sub="Your revenue breakdown" icon="💰" />
         <div className="gradient-gold-subtle rounded-[20px] py-7 px-6 text-center relative overflow-hidden">
           <div className="absolute -right-5 -top-5 w-[120px] h-[120px] rounded-full bg-white/10" />
@@ -145,7 +174,7 @@ export default function VendorApp({ tab }: { tab: string }) {
 
   if (tab === "profile") {
     return (
-      <div className="p-6 px-4 flex flex-col gap-5 animate-fade-up">
+      <div className="p-6 px-4 flex flex-col gap-5 animate-fade-up max-w-[800px] mx-auto">
         <div className="text-center pt-2.5">
           <div className="w-20 h-20 rounded-2xl gradient-gold mx-auto mb-3.5 flex items-center justify-center text-4xl">🍲</div>
           <div className="font-display text-[28px] font-bold text-foreground">{restaurant?.name || "Your Restaurant"}</div>
@@ -166,12 +195,14 @@ export default function VendorApp({ tab }: { tab: string }) {
   }
 
   // Dashboard (default)
+  if (restLoading) return <div className="flex justify-center items-center min-h-[300px]"><Spinner size={32} /></div>;
+
   const todayOrders = orders?.filter((o) => new Date(o.created_at).toDateString() === new Date().toDateString()) ?? [];
   const todayRevenue = todayOrders.reduce((a, o) => a + o.total_amount, 0);
-  const pendingCount = orders?.filter((o) => o.status === "Pending").length ?? 0;
+  const pendingCount = orders?.filter((o) => o.status === "pending").length ?? 0;
 
   return (
-    <div className="p-6 px-4 flex flex-col gap-5 animate-fade-up">
+    <div className="p-6 px-4 flex flex-col gap-5 animate-fade-up max-w-[800px] mx-auto">
       <div className="flex justify-between items-center">
         <div>
           <div className="text-muted-foreground text-[13px]">Welcome back,</div>
@@ -198,7 +229,8 @@ export default function VendorApp({ tab }: { tab: string }) {
       <div className="bg-card border border-border rounded-2xl p-5">
         <STitle>Live Orders</STitle>
         <div className="flex flex-col gap-2.5 mt-3">
-          {todayOrders.slice(0, 3).map((o) => (
+          {ordersLoading && <div className="flex justify-center py-4"><Spinner /></div>}
+          {!ordersLoading && todayOrders.slice(0, 5).map((o) => (
             <div key={o.id} className="p-3.5 bg-secondary rounded-[10px] flex justify-between items-center">
               <div>
                 <div className="font-semibold text-foreground text-sm">{o.order_items?.map((i: any) => i.name).join(", ")}</div>
@@ -210,7 +242,7 @@ export default function VendorApp({ tab }: { tab: string }) {
               </div>
             </div>
           ))}
-          {todayOrders.length === 0 && <div className="text-muted-foreground text-sm text-center py-4">No orders today</div>}
+          {!ordersLoading && todayOrders.length === 0 && <div className="text-muted-foreground text-sm text-center py-4">No orders today</div>}
         </div>
       </div>
     </div>
